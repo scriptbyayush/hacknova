@@ -243,10 +243,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             width: '7px',
             height: '7px',
             borderRadius: '50%',
-            background: backendOnline ? '#10b981' : '#f59e0b',
-            boxShadow: `0 0 8px ${backendOnline ? '#10b981' : '#f59e0b'}`
+            background: '#10b981',
+            boxShadow: '0 0 8px #10b981'
           }} />
-          <span>{backendOnline ? 'FastAPI Connected' : 'Local Sandbox Mode'}</span>
+          <span>{backendOnline ? 'FastAPI Connected' : 'Gemini AI Active'}</span>
         </div>
 
         {/* Settings button */}

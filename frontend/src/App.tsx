@@ -27,8 +27,8 @@ export const App: React.FC = () => {
       }
     }
     return {
-      llmProvider: 'local',
-      geminiApiKey: '',
+      llmProvider: 'gemini',
+      geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
       openaiApiKey: '',
       githubToken: '',
       githubRepo: 'hacknova-team/meetflow-core',
@@ -36,7 +36,7 @@ export const App: React.FC = () => {
       trelloToken: '',
       trelloBoardId: '',
       trelloListId: '',
-      backendUrl: 'http://127.0.0.1:8000'
+      backendUrl: 'none'
     };
   });
 

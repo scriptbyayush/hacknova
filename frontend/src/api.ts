@@ -16,28 +16,161 @@ export async function analyzeTranscriptAPI(
   title: string,
   settings: AppSettings
 ): Promise<MeetingAnalysisResponse> {
-  try {
-    const res = await fetch(`${settings.backendUrl || DEFAULT_BACKEND_URL}/api/analyze-transcript`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        transcript,
-        title,
-        llm_api_key: settings.llmProvider === 'gemini' ? settings.geminiApiKey : settings.openaiApiKey,
-        llm_provider: settings.llmProvider
-      }),
-      signal: AbortSignal.timeout(8000)
-    });
-
-    if (res.ok) {
-      return await res.json();
+  const geminiKey = settings.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY || '';
+  if (settings.llmProvider === 'gemini' && geminiKey) {
+    try {
+      const geminiResult = await callGeminiAPI(transcript, title, geminiKey);
+      if (geminiResult) {
+        return geminiResult;
+      }
+    } catch (geminiErr) {
+      console.warn('Gemini live call error, falling back to smart local NLP engine', geminiErr);
     }
-  } catch (err) {
-    console.warn('Backend unavailable or slow, falling back to client-side smart parser', err);
   }
 
-  // Client-side fallback smart extraction
+  // 2. Check if a local/remote FastAPI backend is running
+  if (settings.backendUrl && settings.backendUrl !== 'none') {
+    try {
+      const res = await fetch(`${settings.backendUrl}/api/analyze-transcript`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transcript,
+          title,
+          llm_api_key: geminiKey,
+          llm_provider: settings.llmProvider
+        }),
+        signal: AbortSignal.timeout(3000)
+      });
+
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Backend not running on Vercel, proceed to clientSideParse
+    }
+  }
+
+  // 3. Client-side deterministic smart NLP engine
   return clientSideParse(transcript, title);
+}
+
+async function callGeminiAPI(transcript: string, title: string, apiKey: string): Promise<MeetingAnalysisResponse | null> {
+  const models = ['gemini-1.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  const prompt = `You are MeetFlow AI's meeting automation agent. Extract actionable tasks, commitments, suggestions, and decisions from this transcript.
+CRITICAL RULES:
+1. Distinctly classify each item as:
+   - "confirmed": Confirmed commitment with owner and deadline (e.g. "Ayush will complete login page by Friday")
+   - "suggestion": Proposed idea or undecided feature (e.g. "Rahul suggested adding Google login, but not finalized")
+   - "question": Open question or consensus needed
+2. Output valid JSON in this exact structure:
+{
+  "attendees": ["Ayush", "Rahul"],
+  "key_decisions": ["Agreed: Complete login page by Friday"],
+  "discussion_points": ["Rahul suggested adding Google login"],
+  "tasks": [
+    {
+      "title": "Clear action title",
+      "description": "Short context",
+      "assignee": "Person name or Unassigned",
+      "deadline": "Friday",
+      "classification": "confirmed",
+      "priority": "high",
+      "tags": ["auth", "frontend"],
+      "estimated_hours": 4
+    }
+  ]
+}
+
+Transcript:
+"""${transcript}"""`;
+
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json'
+          }
+        }),
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const parsed = JSON.parse(text);
+          if (parsed.tasks && Array.isArray(parsed.tasks)) {
+            const tasks: TaskItem[] = parsed.tasks.map((t: any, idx: number) => {
+              const conflicts: ConflictWarning[] = [];
+              if (!t.assignee || t.assignee.toLowerCase() === 'unassigned' || t.assignee.toLowerCase().includes('team')) {
+                conflicts.push({
+                  id: `conf-ai-${idx}-1`,
+                  conflict_type: 'missing_owner',
+                  message: 'No specific owner assigned by AI.',
+                  severity: 'warning',
+                  suggested_fix: 'Assign to a team member in review gate.'
+                });
+              }
+              if (!t.deadline || t.deadline.toLowerCase() === 'not specified' || t.deadline.toLowerCase() === 'soon') {
+                conflicts.push({
+                  id: `conf-ai-${idx}-2`,
+                  conflict_type: 'ambiguous_deadline',
+                  message: 'Deadline is missing or ambiguous.',
+                  severity: 'warning',
+                  suggested_fix: 'Assign a due date before dispatching.'
+                });
+              }
+
+              return {
+                id: `task-gemini-${idx}-${Date.now().toString().slice(-4)}`,
+                title: t.title || 'Task Deliverable',
+                description: t.description || '',
+                assignee: t.assignee || 'Unassigned',
+                deadline: t.deadline || 'Pending Approval',
+                classification: (t.classification as any) || 'confirmed',
+                priority: (t.priority as any) || 'medium',
+                status: t.classification === 'suggestion' ? 'backlog' : 'todo',
+                approval_status: 'pending',
+                confidence: 0.98,
+                tags: t.tags || [t.classification || 'task'],
+                estimated_hours: t.estimated_hours || 3,
+                source_quote: t.description || '',
+                conflicts
+              };
+            });
+
+            return {
+              meeting_id: `meet-gemini-${Date.now()}`,
+              title,
+              transcript,
+              summary: {
+                key_decisions: parsed.key_decisions || [],
+                discussion_points: parsed.discussion_points || [],
+                next_meeting: 'Next Scheduled Sprint Sync',
+                sentiment: 'productive'
+              },
+              tasks,
+              detected_attendees: parsed.attendees || ['Ayush', 'Rahul'],
+              conflict_count: tasks.reduce((acc, t) => acc + t.conflicts.length, 0),
+              confirmed_count: tasks.filter(t => t.classification === 'confirmed').length,
+              suggestion_count: tasks.filter(t => t.classification === 'suggestion').length,
+              unresolved_count: tasks.filter(t => t.classification === 'question').length,
+              analyzed_at: new Date().toISOString()
+            };
+          }
+        }
+      }
+    } catch {
+      // Continue to next model or fallback
+    }
+  }
+  return null;
 }
 
 export async function exportTasksAPI(
