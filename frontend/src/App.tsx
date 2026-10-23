@@ -37,7 +37,10 @@ export const App: React.FC = () => {
       trelloToken: '',
       trelloBoardId: '',
       trelloListId: '',
-      backendUrl: 'none'
+      backendUrl: 'none',
+      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+      googleRedirectUri: import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://meetflow.vipto.in/',
+      googleConnected: true
     };
   });
 

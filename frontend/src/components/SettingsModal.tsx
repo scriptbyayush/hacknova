@@ -207,6 +207,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Google Meet & Workspace OAuth (Vipto Integration) */}
+          <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(6, 182, 212, 0.05)', border: '1px solid rgba(6, 182, 212, 0.25)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={16} color="#06b6d4" />
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffffff' }}>Google Meet OAuth 2.0 (Vipto)</span>
+              </div>
+              <span className="badge badge-question" style={{ fontSize: '0.65rem' }}>Workspace REST API</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  Google OAuth Client ID
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="241109...apps.googleusercontent.com"
+                  value={formData.googleClientId ?? ''}
+                  onChange={(e) => setFormData({ ...formData, googleClientId: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Redirect URI
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="https://meetflow.vipto.in/"
+                    value={formData.googleRedirectUri ?? 'https://meetflow.vipto.in/'}
+                    onChange={(e) => setFormData({ ...formData, googleRedirectUri: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    Google Client Secret (Stored in .env)
+                  </label>
+                  <input
+                    type="password"
+                    className="input"
+                    placeholder="GOCSPX-..."
+                    value={formData.googleClientSecret ?? ''}
+                    onChange={(e) => setFormData({ ...formData, googleClientSecret: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.73rem', color: '#f87171', background: 'rgba(239, 68, 68, 0.08)', padding: '8px 10px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                🔒 <strong>Security Warning:</strong> Google Client Secret must only be used on your secure backend (or in Vercel Serverless environment variables) to exchange the authorization code. Never expose it in client-side bundles.
+              </div>
+            </div>
+          </div>
+
+
           {/* Actions */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
             <button type="button" onClick={onClose} className="btn btn-secondary">

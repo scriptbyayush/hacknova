@@ -64,6 +64,18 @@ export interface MeetingAnalysisResponse {
   analyzed_at: string;
 }
 
+export interface GoogleMeetConference {
+  conferenceId: string;
+  spaceId: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  transcriptState: 'FILE_GENERATED' | 'PROCESSING' | 'NOT_STARTED';
+  transcriptUrl?: string;
+  transcriptContent?: string;
+  attendees: string[];
+}
+
 export interface AppSettings {
   llmProvider: 'local' | 'gemini' | 'openai';
   geminiApiKey: string;
@@ -75,4 +87,9 @@ export interface AppSettings {
   trelloBoardId: string;
   trelloListId: string;
   backendUrl: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+  googleRedirectUri?: string;
+  googleConnected?: boolean;
 }
+

@@ -12,12 +12,16 @@ from models import (
 from ai_engine import process_meeting_transcript
 from conflict_detector import detect_conflicts
 from integrations import export_to_github, export_to_trello
+from google_meet import router as google_meet_router
 
 app = FastAPI(
     title="MeetFlow AI — Meeting-to-Execution Automation API",
     description="Transforms meeting discussions into approved, trackable tasks for GitHub and Trello.",
     version="1.0.0"
 )
+
+app.include_router(google_meet_router)
+
 
 # Enable CORS for local dev
 app.add_middleware(
