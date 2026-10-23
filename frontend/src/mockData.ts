@@ -5,9 +5,10 @@ export const SAMPLE_TRANSCRIPTS = [
     id: 'sample-1',
     title: 'HACKNOVA Pitch Benchmark (Slide 9 Example)',
     tag: 'Official Spec',
-    description: 'Login page, Google login suggestion, and API documentation.',
-    content: `Ayush: Let's finish the login page by Friday. Rahul can investigate Google login, but we haven't decided whether to include it.
-Rahul: Sounds good. Ayush, can you also update the API documentation by Monday?
+    description: 'Ayush login page (Friday) & Rahul Google login suggestion (pending approval).',
+    content: `Ayush: I will complete the login page by Friday.
+Rahul: Rahul suggested adding Google login, but the team hasn't finalized it yet.
+Rahul: Ayush, can you also update the API documentation by Monday?
 Ayush: Yes, I will update the API documentation by Monday.`
   },
   {
@@ -40,8 +41,8 @@ export const INITIAL_MEETING_DATA: MeetingAnalysisResponse = {
   transcript: SAMPLE_TRANSCRIPTS[0].content,
   summary: {
     key_decisions: [
-      'Agreed: Complete the authentication and login page (Ayush, due Friday)',
-      'Agreed: Update and publish API documentation (Ayush, due Monday)'
+      'Confirmed task: Complete the login page (Assigned to Ayush, due Friday)',
+      'Confirmed task: Update and publish API documentation (Assigned to Ayush, due Monday)'
     ],
     discussion_points: [
       'Suggestion: Rahul suggested adding Google login, but the team has not finalized it.',
@@ -53,23 +54,23 @@ export const INITIAL_MEETING_DATA: MeetingAnalysisResponse = {
   tasks: [
     {
       id: 'task-auth-01',
-      title: 'Complete the authentication and login page',
-      description: "Let's finish the login page by Friday.",
+      title: 'Complete the login page',
+      description: 'Ayush will complete the login page by Friday.',
       assignee: 'Ayush',
       deadline: 'Friday',
       classification: 'confirmed',
       priority: 'high',
       status: 'todo',
       approval_status: 'pending',
-      confidence: 0.98,
-      tags: ['frontend', 'auth', 'core-flow'],
+      confidence: 0.99,
+      tags: ['frontend', 'auth', 'login-page'],
       estimated_hours: 6.0,
-      source_quote: "Let's finish the login page by Friday.",
+      source_quote: 'Ayush: I will complete the login page by Friday.',
       conflicts: []
     },
     {
       id: 'task-sugg-02',
-      title: 'Investigate Google login integration (Evaluate OAuth 2.0)',
+      title: 'Add Google login (Evaluate OAuth integration)',
       description: "Rahul suggested adding Google login, but the team hasn't finalized it.",
       assignee: 'Rahul',
       deadline: 'Pending Approval',
@@ -77,10 +78,10 @@ export const INITIAL_MEETING_DATA: MeetingAnalysisResponse = {
       priority: 'low',
       status: 'backlog',
       approval_status: 'pending',
-      confidence: 0.91,
-      tags: ['suggestion', 'exploratory', 'auth'],
+      confidence: 0.92,
+      tags: ['suggestion', 'exploratory', 'google-login'],
       estimated_hours: 3.5,
-      source_quote: "Rahul suggested adding Google login, but the team hasn't finalized it.",
+      source_quote: "Rahul: Rahul suggested adding Google login, but the team hasn't finalized it yet.",
       conflicts: [
         {
           id: 'conf-sugg-1',
