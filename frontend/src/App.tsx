@@ -6,12 +6,15 @@ import { ExecutionHub } from './components/ExecutionHub';
 import { ProgressTracker } from './components/ProgressTracker';
 import { SlideDeckModal } from './components/SlideDeckModal';
 import { SettingsModal } from './components/SettingsModal';
+import { OverviewDashboard } from './components/OverviewDashboard';
 import type { MeetingAnalysisResponse, TaskItem, AppSettings } from './types';
 import { INITIAL_MEETING_DATA } from './mockData';
 import { checkBackendHealth } from './api';
 
+export type ActiveTab = 'overview' | 'studio' | 'approval' | 'execution' | 'tracker' | 'github';
+
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'studio' | 'approval' | 'execution' | 'tracker'>('approval');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [analysisData, setAnalysisData] = useState<MeetingAnalysisResponse | null>(INITIAL_MEETING_DATA);
   const [backendOnline, setBackendOnline] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -20,27 +23,22 @@ export const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('meetflow_settings');
     if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // use default
-      }
+      try { return JSON.parse(saved); } catch {}
     }
     return {
       llmProvider: 'gemini',
       geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
       openaiApiKey: '',
       githubToken: '',
-      githubRepo: 'hacknova-team/meetflow-core',
+      githubRepo: 'scriptbyayush/hacknova',
       trelloKey: '',
       trelloToken: '',
       trelloBoardId: '',
       trelloListId: '',
-      backendUrl: 'none'
+      backendUrl: 'http://127.0.0.1:8000'
     };
   });
 
-  // Check backend health on mount and periodically
   useEffect(() => {
     const check = async () => {
       const isOnline = await checkBackendHealth(settings.backendUrl);
@@ -62,7 +60,6 @@ export const App: React.FC = () => {
     const suggestionCount = updatedTasks.filter(t => t.classification === 'suggestion').length;
     const unresolvedCount = updatedTasks.filter(t => t.classification === 'question').length;
     const conflictCount = updatedTasks.reduce((acc, t) => acc + t.conflicts.length, 0);
-
     setAnalysisData({
       ...analysisData,
       tasks: updatedTasks,
@@ -79,12 +76,10 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      
-      {/* Top Navbar */}
+    <div className="app-shell">
       <Navbar
         activeTab={activeTab}
-        setActiveTab={(tab: string) => setActiveTab(tab as any)}
+        setActiveTab={(tab: string) => setActiveTab(tab as ActiveTab)}
         analysisData={analysisData}
         backendOnline={backendOnline}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -92,8 +87,16 @@ export const App: React.FC = () => {
         onLoadSlideDemo={handleLoadSlideDemo}
       />
 
-      {/* Main Content Body */}
-      <main style={{ flex: 1, paddingBottom: '60px' }}>
+      <main className="app-content" style={{ paddingBottom: '60px' }}>
+        {activeTab === 'overview' && (
+          <OverviewDashboard
+            analysisData={analysisData}
+            backendOnline={backendOnline}
+            settings={settings}
+            onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
+          />
+        )}
+
         {activeTab === 'studio' && (
           <TranscriptStudio
             settings={settings}
@@ -127,25 +130,29 @@ export const App: React.FC = () => {
             onUpdateTasks={handleUpdateTasks}
           />
         )}
+
+        {activeTab === 'github' && (
+          <ExecutionHub
+            analysisData={analysisData}
+            settings={settings}
+            onUpdateTasks={handleUpdateTasks}
+            focusGitHub
+          />
+        )}
       </main>
 
-      {/* Presentation Pitch Deck Fullscreen Viewer */}
       <SlideDeckModal
         isOpen={isPresentationOpen}
         onClose={() => setIsPresentationOpen(false)}
-        onJumpToTab={(tab: string) => {
-          setActiveTab(tab as any);
-        }}
+        onJumpToTab={(tab: string) => setActiveTab(tab as ActiveTab)}
       />
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSave={handleSaveSettings}
       />
-
     </div>
   );
 };

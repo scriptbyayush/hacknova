@@ -1,7 +1,8 @@
 import React from 'react';
-import { 
-  Bot, Mic, CheckCircle2, Send, KanbanSquare, 
-  Presentation, Settings, Sparkles, AlertTriangle 
+import {
+  Bot, Mic, CheckCircle2, Send, KanbanSquare,
+  Presentation, Settings, Sparkles, AlertTriangle,
+  LayoutDashboard, GitBranch
 } from 'lucide-react';
 import type { MeetingAnalysisResponse } from '../types';
 
@@ -15,6 +16,14 @@ interface NavbarProps {
   onLoadSlideDemo: () => void;
 }
 
+interface NavItem {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: number;
+  badgeType?: 'amber' | 'red' | 'green';
+}
+
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
@@ -22,239 +31,111 @@ export const Navbar: React.FC<NavbarProps> = ({
   backendOnline,
   onOpenSettings,
   onOpenPresentation,
-  onLoadSlideDemo
+  onLoadSlideDemo,
 }) => {
   const pendingCount = analysisData?.tasks.filter(t => t.approval_status === 'pending').length || 0;
   const conflictCount = analysisData?.conflict_count || 0;
+  const dispatchedCount = analysisData?.tasks.filter(t => t.github_issue_url || t.trello_card_url).length || 0;
+
+  const navItems: NavItem[] = [
+    { id: 'overview',   label: 'Overview',      icon: <LayoutDashboard size={14} /> },
+    { id: 'studio',     label: 'Meeting Studio', icon: <Mic size={14} /> },
+    {
+      id: 'approval', label: 'Review',     icon: <CheckCircle2 size={14} />,
+      badge: pendingCount > 0 ? pendingCount : conflictCount > 0 ? conflictCount : undefined,
+      badgeType: pendingCount > 0 ? 'amber' : 'red'
+    },
+    {
+      id: 'execution', label: 'Dispatch',  icon: <Send size={14} />,
+      badge: dispatchedCount > 0 ? dispatchedCount : undefined,
+      badgeType: 'green'
+    },
+    { id: 'tracker',    label: 'Board',         icon: <KanbanSquare size={14} /> },
+    { id: 'github',     label: 'GitHub',         icon: <GitBranch size={14} /> },
+  ];
 
   return (
-    <header style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 50,
-      background: 'rgba(7, 9, 14, 0.85)',
-      backdropFilter: 'blur(20px)',
-      borderBottom: '1px solid var(--border-subtle)',
-      padding: '12px 24px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '16px'
-    }}>
+    <header className="top-header">
       {/* Brand */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-        <div style={{
-          width: '42px',
-          height: '42px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 0 20px rgba(99, 102, 241, 0.4)'
-        }}>
-          <Bot size={24} color="#ffffff" />
+      <div
+        className="header-brand"
+        onClick={() => setActiveTab('overview')}
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="header-logo">
+          <Bot size={18} color="#ffffff" />
         </div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', background: 'linear-gradient(to right, #ffffff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              MeetFlow AI
-            </span>
-            <span style={{ 
-              fontSize: '0.65rem', 
-              fontWeight: 700, 
-              padding: '2px 8px', 
-              borderRadius: '9999px', 
-              background: 'rgba(99, 102, 241, 0.15)', 
-              color: '#818cf8',
-              border: '1px solid rgba(99, 102, 241, 0.3)'
-            }}>
-              HACKNOVA'26
-            </span>
+        <div style={{ lineHeight: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+            <span className="header-title">MeetFlow AI</span>
+            <span className="header-badge">HACKNOVA'26</span>
           </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Meeting-to-Execution Automation Agent
-          </p>
+          <span className="header-subtitle">Meeting-to-Execution Agent</span>
         </div>
       </div>
 
-      {/* Navigation tabs */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        background: 'rgba(18, 24, 40, 0.6)',
-        padding: '4px',
-        borderRadius: '12px',
-        border: '1px solid var(--border-subtle)',
-        gap: '4px'
-      }}>
-        <button
-          onClick={() => setActiveTab('studio')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            background: activeTab === 'studio' ? 'var(--accent-primary)' : 'transparent',
-            color: activeTab === 'studio' ? '#ffffff' : 'var(--text-secondary)'
-          }}
-        >
-          <Mic size={16} />
-          <span>Meeting Studio</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('approval')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            background: activeTab === 'approval' ? 'var(--accent-primary)' : 'transparent',
-            color: activeTab === 'approval' ? '#ffffff' : 'var(--text-secondary)'
-          }}
-        >
-          <CheckCircle2 size={16} />
-          <span>Review & Approval</span>
-          {pendingCount > 0 && (
-            <span style={{
-              fontSize: '0.7rem',
-              padding: '1px 6px',
-              borderRadius: '999px',
-              background: '#f59e0b',
-              color: '#000000',
-              fontWeight: 800
-            }}>
-              {pendingCount}
-            </span>
-          )}
-          {conflictCount > 0 && (
-            <span 
-              title={`${conflictCount} active conflicts`}
-              style={{
-                fontSize: '0.7rem',
-                padding: '1px 6px',
-                borderRadius: '999px',
-                background: '#ef4444',
-                color: '#ffffff',
-                fontWeight: 800,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '2px'
-              }}
-            >
-              <AlertTriangle size={10} />
-              {conflictCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('execution')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            background: activeTab === 'execution' ? 'var(--accent-primary)' : 'transparent',
-            color: activeTab === 'execution' ? '#ffffff' : 'var(--text-secondary)'
-          }}
-        >
-          <Send size={16} />
-          <span>Execution & Sync</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('tracker')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            background: activeTab === 'tracker' ? 'var(--accent-primary)' : 'transparent',
-            color: activeTab === 'tracker' ? '#ffffff' : 'var(--text-secondary)'
-          }}
-        >
-          <KanbanSquare size={16} />
-          <span>Kanban & Tracking</span>
-        </button>
+      {/* Navigation */}
+      <nav className="header-nav">
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            className={`nav-btn ${activeTab === item.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(item.id)}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+            {item.badge !== undefined && item.badge > 0 && (
+              <span className={`nav-badge nav-badge-${item.badgeType || 'amber'}`}>
+                {item.badgeType === 'red' && conflictCount > 0 ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <AlertTriangle size={8} />
+                    {item.badge}
+                  </span>
+                ) : item.badge}
+              </span>
+            )}
+          </button>
+        ))}
       </nav>
 
       {/* Right Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Quick Demo Button */}
+      <div className="header-actions">
+        {/* Demo shortcut */}
         <button
           onClick={onLoadSlideDemo}
           className="btn btn-secondary btn-sm"
-          title="Instantly run benchmark slide scenario"
-          style={{ border: '1px solid rgba(99, 102, 241, 0.4)', background: 'rgba(99, 102, 241, 0.1)' }}
+          title="Load HACKNOVA benchmark transcript (Slide 9)"
+          style={{ border: '1px solid rgba(99,102,241,0.3)', color: 'var(--indigo-light)' }}
         >
-          <Sparkles size={14} color="#818cf8" />
-          <span>Slide 9 Demo</span>
+          <Sparkles size={13} />
+          <span style={{ display: window.innerWidth > 1100 ? 'inline' : 'none' }}>Slide 9</span>
         </button>
 
-        {/* Pitch Deck presentation viewer */}
+        {/* Pitch deck */}
         <button
           onClick={onOpenPresentation}
           className="btn btn-secondary btn-sm"
-          style={{ border: '1px solid rgba(6, 182, 212, 0.4)', background: 'rgba(6, 182, 212, 0.1)' }}
+          title="Open pitch deck"
+          style={{ border: '1px solid rgba(34,211,238,0.25)', color: 'var(--cyan)' }}
         >
-          <Presentation size={14} color="#06b6d4" />
-          <span>Pitch Deck</span>
+          <Presentation size={13} />
+          <span style={{ display: window.innerWidth > 1200 ? 'inline' : 'none' }}>Pitch Deck</span>
         </button>
 
-        {/* Backend health status badge */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '0.75rem',
-          padding: '6px 10px',
-          borderRadius: '8px',
-          background: backendOnline ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-          color: backendOnline ? '#34d399' : '#fbbf24',
-          border: `1px solid ${backendOnline ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`
-        }}>
-          <span style={{
-            width: '7px',
-            height: '7px',
-            borderRadius: '50%',
-            background: '#10b981',
-            boxShadow: '0 0 8px #10b981'
-          }} />
-          <span>{backendOnline ? 'FastAPI Connected' : 'Gemini AI Active'}</span>
+        {/* Backend status */}
+        <div className={`status-pill ${backendOnline ? 'status-pill-green' : 'status-pill-indigo'}`}>
+          <span className={`pulse-dot ${backendOnline ? 'pulse-dot-green' : 'pulse-dot-indigo'}`} />
+          <span style={{ fontSize: '11px', fontWeight: 600 }}>
+            {backendOnline ? 'FastAPI Online' : 'AI Engine'}
+          </span>
         </div>
 
-        {/* Settings button */}
+        {/* Settings */}
         <button
           onClick={onOpenSettings}
-          className="btn btn-secondary btn-sm"
-          style={{ padding: '8px', borderRadius: '8px' }}
-          title="Configure API Keys & Integrations"
+          className="btn btn-ghost btn-icon btn-sm"
+          title="Settings & API Keys"
+          style={{ color: 'var(--text-3)' }}
         >
           <Settings size={16} />
         </button>

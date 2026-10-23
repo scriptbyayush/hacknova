@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   CheckCircle2, Clock, 
-  User, Calendar, TrendingUp, Check 
+  User, Calendar, TrendingUp, Check,
+  GitBranch, ExternalLink
 } from 'lucide-react';
 import type { TaskItem, TaskStatus, MeetingAnalysisResponse } from '../types';
 
@@ -268,6 +269,33 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                             {task.deadline || 'Pending'}
                           </span>
                         </div>
+
+                        {task.github_issue_url && (
+                          <div style={{ marginTop: '2px' }}>
+                            <a
+                              href={task.github_issue_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                fontSize: '0.7rem',
+                                color: '#34d399',
+                                textDecoration: 'none',
+                                fontWeight: 700,
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                background: 'rgba(16, 185, 129, 0.15)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)'
+                              }}
+                            >
+                              <GitBranch size={11} />
+                              <span>Direct to GitHub</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          </div>
+                        )}
 
                         {/* Quick Status Forwarder */}
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>

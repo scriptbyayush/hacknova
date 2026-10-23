@@ -117,9 +117,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* GitHub Integration Section */}
           <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <GitBranch size={16} color="#ffffff" />
-              <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffffff' }}>GitHub Integration</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GitBranch size={16} color="#ffffff" />
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffffff' }}>GitHub Integration</span>
+              </div>
+              <span className="badge badge-question" style={{ fontSize: '0.65rem' }}>REST API v3</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -130,7 +133,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. hacknova/meetflow"
+                  placeholder="e.g. octocat/Hello-World"
                   value={formData.githubRepo}
                   onChange={(e) => setFormData({ ...formData, githubRepo: e.target.value })}
                 />
@@ -143,12 +146,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="password"
                   className="input"
-                  placeholder="ghp_..."
+                  placeholder="ghp_... or github_pat_..."
                   value={formData.githubToken}
                   onChange={(e) => setFormData({ ...formData, githubToken: e.target.value })}
                 />
               </div>
             </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+              Used to create live issues with assignees and labels. If left blank, Sandbox simulator creates high-fidelity issue links without credentials.
+            </p>
           </div>
 
           {/* Trello Integration Section */}

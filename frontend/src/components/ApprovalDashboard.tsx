@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   CheckCircle2, XCircle, AlertTriangle, ArrowUpRight, 
   Edit3, ShieldCheck, Sparkles, User, Calendar, 
-  Clock, Tag, Check, Search
+  Clock, Tag, Check, Search, GitBranch, ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { TaskItem, ClassificationType, TaskPriority, MeetingAnalysisResponse } from '../types';
@@ -431,6 +431,31 @@ export const ApprovalDashboard: React.FC<ApprovalDashboardProps> = ({
                       <XCircle size={14} />
                       <span>Reject</span>
                     </button>
+                  )}
+
+                  {/* Direct GitHub Issue link if already dispatched */}
+                  {task.github_issue_url && (
+                    <a
+                      href={task.github_issue_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-sm"
+                      style={{ 
+                        textDecoration: 'none', 
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px', 
+                        background: 'rgba(16, 185, 129, 0.15)', 
+                        color: '#34d399', 
+                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                        fontWeight: 700
+                      }}
+                      title="Direct to GitHub Issue"
+                    >
+                      <GitBranch size={13} />
+                      <span>Direct to GitHub</span>
+                      <ExternalLink size={12} />
+                    </a>
                   )}
 
                   {/* Edit */}
