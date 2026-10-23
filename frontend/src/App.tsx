@@ -9,6 +9,7 @@ import { SettingsModal } from './components/SettingsModal';
 import type { MeetingAnalysisResponse, TaskItem, AppSettings } from './types';
 import { INITIAL_MEETING_DATA } from './mockData';
 import { checkBackendHealth } from './api';
+import { saveMeetingToFirestore, saveTasksToFirestore, loadLatestMeetingFromFirestore } from './firebase';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'studio' | 'approval' | 'execution' | 'tracker'>('approval');
@@ -40,13 +41,21 @@ export const App: React.FC = () => {
     };
   });
 
-  // Check backend health on mount and periodically
+  // Check backend health and load Firestore cache on mount
   useEffect(() => {
     const check = async () => {
       const isOnline = await checkBackendHealth(settings.backendUrl);
       setBackendOnline(isOnline);
     };
     check();
+
+    // Check Cloud Firestore for any previously saved meetings
+    loadLatestMeetingFromFirestore().then((remoteMeeting) => {
+      if (remoteMeeting && remoteMeeting.tasks && remoteMeeting.tasks.length > 0) {
+        setAnalysisData(remoteMeeting);
+      }
+    }).catch(() => {});
+
     const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
   }, [settings.backendUrl]);
@@ -63,18 +72,22 @@ export const App: React.FC = () => {
     const unresolvedCount = updatedTasks.filter(t => t.classification === 'question').length;
     const conflictCount = updatedTasks.reduce((acc, t) => acc + t.conflicts.length, 0);
 
-    setAnalysisData({
+    const updated = {
       ...analysisData,
       tasks: updatedTasks,
       confirmed_count: confirmedCount,
       suggestion_count: suggestionCount,
       unresolved_count: unresolvedCount,
       conflict_count: conflictCount
-    });
+    };
+
+    setAnalysisData(updated);
+    saveTasksToFirestore(analysisData.meeting_id, updatedTasks);
   };
 
   const handleLoadSlideDemo = () => {
     setAnalysisData(INITIAL_MEETING_DATA);
+    saveMeetingToFirestore(INITIAL_MEETING_DATA);
     setActiveTab('approval');
   };
 
@@ -100,6 +113,7 @@ export const App: React.FC = () => {
             analysisData={analysisData}
             onAnalysisComplete={(res) => {
               setAnalysisData(res);
+              saveMeetingToFirestore(res);
               setActiveTab('approval');
             }}
           />

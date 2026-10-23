@@ -246,7 +246,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             background: '#10b981',
             boxShadow: '0 0 8px #10b981'
           }} />
-          <span>{backendOnline ? 'FastAPI Connected' : 'Gemini AI Active'}</span>
+          <span>{backendOnline ? 'FastAPI Connected' : 'Firestore & Gemini Live'}</span>
         </div>
 
         {/* Settings button */}
