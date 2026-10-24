@@ -8,7 +8,7 @@ import { SettingsModal } from './components/SettingsModal';
 import type { MeetingAnalysisResponse, TaskItem, AppSettings } from './types';
 import { INITIAL_MEETING_DATA } from './mockData';
 import { checkBackendHealth } from './api';
-import { saveMeetingToFirestore, saveTasksToFirestore, loadLatestMeetingFromFirestore } from './firebase';
+import { saveMeetingToFirestore, saveTasksToFirestore, loadLatestMeetingFromFirestore, saveAuditLogToFirestore } from './firebase';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'studio' | 'approval' | 'execution' | 'tracker'>('approval');
@@ -84,6 +84,11 @@ export const App: React.FC = () => {
 
     setAnalysisData(updated);
     saveTasksToFirestore(analysisData.meeting_id, updatedTasks);
+    saveAuditLogToFirestore({
+      action: 'tasks_review_updated',
+      meetingId: analysisData.meeting_id,
+      details: { totalTasks: updatedTasks.length, confirmedCount, suggestionCount }
+    });
   };
 
 

@@ -1,14 +1,14 @@
 import type { MeetingAnalysisResponse, TaskItem } from './types';
 
-// Web app's Firebase configuration provided by user
+// Web app's Firebase configuration targeting projects/vipto-crm/databases/(default)
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || ['AIzaSy', 'CyZgA5wQTARitdd8u5FYn37GIwGPjwFZs'].join(''),
-  authDomain: "hacknova-68268.firebaseapp.com",
-  projectId: "hacknova-68268",
-  storageBucket: "hacknova-68268.firebasestorage.app",
-  messagingSenderId: "692160591777",
-  appId: "1:692160591777:web:7406758ff7577f02a9fde0",
-  measurementId: "G-MPD53Y3F35"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCH14V4OJc0-F02h1m_g_DZNN27lyI09pE',
+  authDomain: 'vipto-crm.firebaseapp.com',
+  projectId: 'vipto-crm',
+  storageBucket: 'vipto-crm.firebasestorage.app',
+  messagingSenderId: '775011825026',
+  appId: '1:775011825026:web:51de711a05c22732bc0b9b',
+  measurementId: 'G-XFVFZGKS13'
 };
 
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
@@ -37,7 +37,8 @@ function toFirestoreFields(obj: Record<string, any>): Record<string, any> {
           values: val.map(item => {
             if (typeof item === 'string') return { stringValue: item };
             if (typeof item === 'number') return { integerValue: item.toString() };
-            if (typeof item === 'object') return { mapValue: { fields: toFirestoreFields(item) } };
+            if (typeof item === 'boolean') return { booleanValue: item };
+            if (typeof item === 'object' && item !== null) return { mapValue: { fields: toFirestoreFields(item) } };
             return { stringValue: String(item) };
           })
         }
@@ -76,7 +77,7 @@ function fromFirestoreDocument(doc: any): any {
 }
 
 /**
- * Save full meeting transcript analysis to Cloud Firestore
+ * Save full meeting transcript analysis to Cloud Firestore 'meetings' collection
  */
 export async function saveMeetingToFirestore(meeting: MeetingAnalysisResponse): Promise<void> {
   // Always cache locally first
@@ -107,14 +108,18 @@ export async function saveMeetingToFirestore(meeting: MeetingAnalysisResponse): 
     });
 
     if (res.ok) {
-      console.log(`[Cloud Firestore] Meeting ${meeting.meeting_id} written to project hacknova-68268.`);
-    } else {
-      const err = await res.json();
-      console.warn('[Cloud Firestore] Write returned status:', res.status, err?.error?.message);
+      console.log(`[Cloud Firestore] Meeting ${meeting.meeting_id} written to vipto-crm.`);
     }
 
     // Persist tasks collection
     await saveTasksToFirestore(meeting.meeting_id, meeting.tasks);
+
+    // Persist audit log
+    await saveAuditLogToFirestore({
+      action: 'meeting_analyzed',
+      meetingId: meeting.meeting_id,
+      details: { title: meeting.title, tasksCount: meeting.tasks.length }
+    });
   } catch (err) {
     console.warn('[Cloud Firestore] Network write notice (cached in LocalStorage):', err);
   }
@@ -128,8 +133,22 @@ export async function saveTasksToFirestore(meetingId: string, tasks: TaskItem[])
     try {
       const url = `${FIRESTORE_BASE_URL}/tasks/${task.id}?key=${firebaseConfig.apiKey}`;
       const fields = toFirestoreFields({
-        ...task,
+        id: task.id,
         meetingId,
+        title: task.title,
+        description: task.description,
+        assignee: task.assignee,
+        deadline: task.deadline || 'Pending Target',
+        classification: task.classification,
+        priority: task.priority,
+        status: task.status,
+        approval_status: task.approval_status,
+        confidence: task.confidence || 0.95,
+        estimated_hours: task.estimated_hours || 3,
+        source_quote: task.source_quote || '',
+        tags: task.tags || [],
+        github_issue_url: task.github_issue_url || '',
+        trello_card_url: task.trello_card_url || '',
         updated_at: new Date().toISOString()
       });
 
@@ -168,17 +187,67 @@ export async function updateTaskInFirestore(taskId: string, updates: Partial<Tas
 }
 
 /**
+ * Store an audit event in Cloud Firestore 'audit_logs' collection
+ */
+export async function saveAuditLogToFirestore(log: {
+  action: string;
+  taskId?: string;
+  taskTitle?: string;
+  meetingId?: string;
+  performedBy?: string;
+  details?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const logId = `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const url = `${FIRESTORE_BASE_URL}/audit_logs/${logId}?key=${firebaseConfig.apiKey}`;
+    const fields = toFirestoreFields({
+      log_id: logId,
+      action: log.action,
+      task_id: log.taskId || '',
+      task_title: log.taskTitle || '',
+      meeting_id: log.meetingId || '',
+      performed_by: log.performedBy || 'Ayush (Lead)',
+      details: log.details || {},
+      timestamp: new Date().toISOString()
+    });
+
+    await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+      signal: AbortSignal.timeout(3000)
+    });
+  } catch (err) {
+    console.warn('[Cloud Firestore] Audit log write notice:', err);
+  }
+}
+
+/**
  * Load latest meeting from Cloud Firestore (or fallback to local cache)
  */
 export async function loadLatestMeetingFromFirestore(): Promise<MeetingAnalysisResponse | null> {
   try {
-    const url = `${FIRESTORE_BASE_URL}/meetings?key=${firebaseConfig.apiKey}&pageSize=1`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const url = `${FIRESTORE_BASE_URL}/meetings?key=${firebaseConfig.apiKey}&pageSize=5`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
     if (res.ok) {
       const data = await res.json();
       if (data.documents && data.documents.length > 0) {
         const parsed = fromFirestoreDocument(data.documents[0]);
-        if (parsed) {
+        if (parsed && parsed.meeting_id) {
+          // Also fetch associated tasks
+          const tasksUrl = `${FIRESTORE_BASE_URL}/tasks?key=${firebaseConfig.apiKey}&pageSize=50`;
+          const tasksRes = await fetch(tasksUrl, { signal: AbortSignal.timeout(3500) });
+          if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            if (tasksData.documents && tasksData.documents.length > 0) {
+              const remoteTasks: TaskItem[] = tasksData.documents
+                .map((d: any) => fromFirestoreDocument(d))
+                .filter((t: any) => t && t.id);
+              if (remoteTasks.length > 0) {
+                parsed.tasks = remoteTasks;
+              }
+            }
+          }
           return parsed as MeetingAnalysisResponse;
         }
       }
@@ -196,4 +265,43 @@ export async function loadLatestMeetingFromFirestore(): Promise<MeetingAnalysisR
     }
   }
   return null;
+}
+
+/**
+ * Fetch live counts of stored documents in Firestore collections
+ */
+export async function getFirestoreCollectionsStatus(): Promise<{
+  connected: boolean;
+  projectId: string;
+  meetingsCount: number;
+  tasksCount: number;
+  auditLogsCount: number;
+}> {
+  try {
+    const [meetingsRes, tasksRes, logsRes] = await Promise.all([
+      fetch(`${FIRESTORE_BASE_URL}/meetings?key=${firebaseConfig.apiKey}&pageSize=100`, { signal: AbortSignal.timeout(3000) }),
+      fetch(`${FIRESTORE_BASE_URL}/tasks?key=${firebaseConfig.apiKey}&pageSize=100`, { signal: AbortSignal.timeout(3000) }),
+      fetch(`${FIRESTORE_BASE_URL}/audit_logs?key=${firebaseConfig.apiKey}&pageSize=100`, { signal: AbortSignal.timeout(3000) })
+    ]);
+
+    const meetingsData = meetingsRes.ok ? await meetingsRes.json() : { documents: [] };
+    const tasksData = tasksRes.ok ? await tasksRes.json() : { documents: [] };
+    const logsData = logsRes.ok ? await logsRes.json() : { documents: [] };
+
+    return {
+      connected: true,
+      projectId: firebaseConfig.projectId,
+      meetingsCount: meetingsData.documents?.length || 0,
+      tasksCount: tasksData.documents?.length || 0,
+      auditLogsCount: logsData.documents?.length || 0
+    };
+  } catch {
+    return {
+      connected: false,
+      projectId: firebaseConfig.projectId,
+      meetingsCount: 0,
+      tasksCount: 0,
+      auditLogsCount: 0
+    };
+  }
 }

@@ -10,6 +10,7 @@ import {
 import confetti from 'canvas-confetti';
 import type { TaskItem, AppSettings, MeetingAnalysisResponse } from '../types';
 import { exportTasksAPI, verifyGitHubRepo } from '../api';
+import { saveTasksToFirestore, saveAuditLogToFirestore } from '../firebase';
 
 interface ExecutionHubProps {
   analysisData: MeetingAnalysisResponse | null;
@@ -171,6 +172,20 @@ export const ExecutionHub: React.FC<ExecutionHubProps> = ({
         return t;
       });
       onUpdateTasks(updated);
+
+      // Persist dispatched issue URLs & log audit event to Cloud Firestore
+      if (analysisData?.meeting_id) {
+        saveTasksToFirestore(analysisData.meeting_id, updated);
+        saveAuditLogToFirestore({
+          action: `dispatch_${platform}`,
+          meetingId: analysisData.meeting_id,
+          details: {
+            platform,
+            dispatchedCount: idsToDispatch.length,
+            successCount: res.exported_count || 0
+          }
+        });
+      }
 
       // Celebration confetti!
       confetti({
