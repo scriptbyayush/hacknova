@@ -53,7 +53,16 @@ export const App: React.FC = () => {
     // Check Cloud Firestore for any previously saved meetings
     loadLatestMeetingFromFirestore().then((remoteMeeting) => {
       if (remoteMeeting && remoteMeeting.tasks && remoteMeeting.tasks.length > 0) {
-        setAnalysisData(remoteMeeting);
+        const normalizedTasks = remoteMeeting.tasks.map(t => ({
+          ...t,
+          conflicts: Array.isArray(t.conflicts) ? t.conflicts : [],
+          tags: Array.isArray(t.tags) ? t.tags : []
+        }));
+        setAnalysisData({
+          ...remoteMeeting,
+          tasks: normalizedTasks,
+          conflict_count: remoteMeeting.conflict_count ?? normalizedTasks.reduce((acc, t) => acc + t.conflicts.length, 0)
+        });
       }
     }).catch(() => {});
 
@@ -71,7 +80,7 @@ export const App: React.FC = () => {
     const confirmedCount = updatedTasks.filter(t => t.classification === 'confirmed').length;
     const suggestionCount = updatedTasks.filter(t => t.classification === 'suggestion').length;
     const unresolvedCount = updatedTasks.filter(t => t.classification === 'question').length;
-    const conflictCount = updatedTasks.reduce((acc, t) => acc + t.conflicts.length, 0);
+    const conflictCount = updatedTasks.reduce((acc, t) => acc + (t.conflicts?.length || 0), 0);
 
     const updated = {
       ...analysisData,

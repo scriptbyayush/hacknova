@@ -149,13 +149,13 @@ export const ApprovalDashboard: React.FC<ApprovalDashboardProps> = ({
     const updated = tasks.map(t => {
       if (t.id === taskId) {
         if (fixType === 'assign_ayush') {
-          return { ...t, assignee: 'Ayush', conflicts: t.conflicts.filter(c => c.conflict_type !== 'missing_owner') };
+          return { ...t, assignee: 'Ayush', conflicts: (t.conflicts || []).filter(c => c.conflict_type !== 'missing_owner') };
         }
         if (fixType === 'set_deadline_friday') {
-          return { ...t, deadline: 'Friday', conflicts: t.conflicts.filter(c => c.conflict_type !== 'ambiguous_deadline') };
+          return { ...t, deadline: 'Friday', conflicts: (t.conflicts || []).filter(c => c.conflict_type !== 'ambiguous_deadline') };
         }
         if (fixType === 'dismiss_duplicate') {
-          return { ...t, conflicts: t.conflicts.filter(c => c.conflict_type !== 'duplicate') };
+          return { ...t, conflicts: (t.conflicts || []).filter(c => c.conflict_type !== 'duplicate') };
         }
       }
       return t;
@@ -170,7 +170,7 @@ export const ApprovalDashboard: React.FC<ApprovalDashboardProps> = ({
       (filterType === 'confirmed' && task.classification === 'confirmed') ||
       (filterType === 'suggestion' && task.classification === 'suggestion') ||
       (filterType === 'question' && task.classification === 'question') ||
-      (filterType === 'conflicts' && task.conflicts.length > 0) ||
+      (filterType === 'conflicts' && (task.conflicts?.length || 0) > 0) ||
       (filterType === 'approved' && task.approval_status === 'approved') ||
       (filterType === 'pending' && task.approval_status === 'pending');
 
@@ -186,7 +186,7 @@ export const ApprovalDashboard: React.FC<ApprovalDashboardProps> = ({
   const suggestionTasks = filteredTasks.filter(t => t.classification === 'suggestion');
   const questionTasks = filteredTasks.filter(t => t.classification === 'question');
 
-  const totalConflicts = tasks.reduce((sum, t) => sum + t.conflicts.length, 0);
+  const totalConflicts = tasks.reduce((sum, t) => sum + (t.conflicts?.length || 0), 0);
   const pendingApprovals = tasks.filter(t => t.approval_status === 'pending').length;
   const approvedCount = tasks.filter(t => t.approval_status === 'approved').length;
 
@@ -394,14 +394,14 @@ export const ApprovalDashboard: React.FC<ApprovalDashboardProps> = ({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Tag size={14} color="var(--accent-primary)" />
-            <span>Tags: {task.tags.join(', ')}</span>
+            <span>Tags: {(task.tags || []).join(', ')}</span>
           </div>
         </div>
 
         {/* Conflicts & Ambiguity Alerts on this task */}
-        {task.conflicts.length > 0 && (
+        {(task.conflicts?.length || 0) > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-            {task.conflicts.map((conf) => (
+            {(task.conflicts || []).map((conf) => (
               <div
                 key={conf.id}
                 style={{

@@ -324,7 +324,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
 
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
                   <span>{conf.startTime}</span>
-                  <span>{conf.attendees.length} Attendees</span>
+                  <span>{(conf.attendees || []).length} Attendees</span>
                 </div>
 
                 {isReady && (
@@ -611,7 +611,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
               <Volume2 size={20} color="var(--color-question)" />
             </div>
             <div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>{analysisData.detected_attendees.length}</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>{(analysisData.detected_attendees || []).length}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Active Attendees</div>
             </div>
           </div>

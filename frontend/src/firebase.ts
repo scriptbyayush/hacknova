@@ -63,7 +63,7 @@ function fromFirestoreDocument(doc: any): any {
     else if ('booleanValue' in valObj) result[key] = valObj.booleanValue;
     else if ('nullValue' in valObj) result[key] = null;
     else if ('arrayValue' in valObj) {
-      result[key] = (valObj.arrayValue.values || []).map((v: any) => {
+      result[key] = ((valObj.arrayValue && valObj.arrayValue.values) || []).map((v: any) => {
         if ('stringValue' in v) return v.stringValue;
         if ('integerValue' in v) return parseInt(v.integerValue, 10);
         if ('mapValue' in v) return fromFirestoreDocument(v.mapValue);
@@ -147,6 +147,7 @@ export async function saveTasksToFirestore(meetingId: string, tasks: TaskItem[])
         estimated_hours: task.estimated_hours || 3,
         source_quote: task.source_quote || '',
         tags: task.tags || [],
+        conflicts: task.conflicts || [],
         github_issue_url: task.github_issue_url || '',
         trello_card_url: task.trello_card_url || '',
         updated_at: new Date().toISOString()
@@ -241,7 +242,19 @@ export async function loadLatestMeetingFromFirestore(): Promise<MeetingAnalysisR
             const tasksData = await tasksRes.json();
             if (tasksData.documents && tasksData.documents.length > 0) {
               const remoteTasks: TaskItem[] = tasksData.documents
-                .map((d: any) => fromFirestoreDocument(d))
+                .map((d: any) => {
+                  const item = fromFirestoreDocument(d);
+                  if (!item) return null;
+                  return {
+                    ...item,
+                    conflicts: Array.isArray(item.conflicts) ? item.conflicts : [],
+                    tags: Array.isArray(item.tags) ? item.tags : [],
+                    assignee: item.assignee || 'Unassigned',
+                    priority: item.priority || 'medium',
+                    status: item.status || 'todo',
+                    approval_status: item.approval_status || 'pending'
+                  };
+                })
                 .filter((t: any) => t && t.id);
               if (remoteTasks.length > 0) {
                 parsed.tasks = remoteTasks;
