@@ -130,7 +130,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <input
                   type="text"
                   className="input"
-                  placeholder="e.g. hacknova/meetflow"
+                  placeholder="e.g. scriptbyayush/hacknova"
                   value={formData.githubRepo}
                   onChange={(e) => setFormData({ ...formData, githubRepo: e.target.value })}
                 />

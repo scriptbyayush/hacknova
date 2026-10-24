@@ -32,7 +32,7 @@ export const App: React.FC = () => {
       geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
       openaiApiKey: '',
       githubToken: '',
-      githubRepo: 'hacknova-team/meetflow-core',
+      githubRepo: 'scriptbyayush/hacknova',
       trelloKey: '',
       trelloToken: '',
       trelloBoardId: '',
