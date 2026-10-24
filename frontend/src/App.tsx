@@ -4,7 +4,6 @@ import { TranscriptStudio } from './components/TranscriptStudio';
 import { ApprovalDashboard } from './components/ApprovalDashboard';
 import { ExecutionHub } from './components/ExecutionHub';
 import { ProgressTracker } from './components/ProgressTracker';
-import { SlideDeckModal } from './components/SlideDeckModal';
 import { SettingsModal } from './components/SettingsModal';
 import type { MeetingAnalysisResponse, TaskItem, AppSettings } from './types';
 import { INITIAL_MEETING_DATA } from './mockData';
@@ -16,7 +15,6 @@ export const App: React.FC = () => {
   const [analysisData, setAnalysisData] = useState<MeetingAnalysisResponse | null>(INITIAL_MEETING_DATA);
   const [backendOnline, setBackendOnline] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [isPresentationOpen, setIsPresentationOpen] = useState<boolean>(false);
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('meetflow_settings');
@@ -88,11 +86,6 @@ export const App: React.FC = () => {
     saveTasksToFirestore(analysisData.meeting_id, updatedTasks);
   };
 
-  const handleLoadSlideDemo = () => {
-    setAnalysisData(INITIAL_MEETING_DATA);
-    saveMeetingToFirestore(INITIAL_MEETING_DATA);
-    setActiveTab('approval');
-  };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -104,8 +97,6 @@ export const App: React.FC = () => {
         analysisData={analysisData}
         backendOnline={backendOnline}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenPresentation={() => setIsPresentationOpen(true)}
-        onLoadSlideDemo={handleLoadSlideDemo}
       />
 
       {/* Main Content Body */}
@@ -147,14 +138,6 @@ export const App: React.FC = () => {
         )}
       </main>
 
-      {/* Presentation Pitch Deck Fullscreen Viewer */}
-      <SlideDeckModal
-        isOpen={isPresentationOpen}
-        onClose={() => setIsPresentationOpen(false)}
-        onJumpToTab={(tab: string) => {
-          setActiveTab(tab as any);
-        }}
-      />
 
       {/* Settings Modal */}
       <SettingsModal

@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Bot, Mic, CheckCircle2, Send, KanbanSquare, 
-  Presentation, Settings, Sparkles, AlertTriangle 
+  Settings, AlertTriangle 
 } from 'lucide-react';
 import type { MeetingAnalysisResponse } from '../types';
 
@@ -11,8 +11,6 @@ interface NavbarProps {
   analysisData: MeetingAnalysisResponse | null;
   backendOnline: boolean;
   onOpenSettings: () => void;
-  onOpenPresentation: () => void;
-  onLoadSlideDemo: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -21,8 +19,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   analysisData,
   backendOnline,
   onOpenSettings,
-  onOpenPresentation,
-  onLoadSlideDemo
 }) => {
   const pendingCount = analysisData?.tasks.filter(t => t.approval_status === 'pending').length || 0;
   const conflictCount = analysisData?.conflict_count || 0;
@@ -206,27 +202,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Quick Demo Button */}
-        <button
-          onClick={onLoadSlideDemo}
-          className="btn btn-secondary btn-sm"
-          title="Instantly run benchmark slide scenario"
-          style={{ border: '1px solid rgba(99, 102, 241, 0.4)', background: 'rgba(99, 102, 241, 0.1)' }}
-        >
-          <Sparkles size={14} color="#818cf8" />
-          <span>Slide 9 Demo</span>
-        </button>
-
-        {/* Pitch Deck presentation viewer */}
-        <button
-          onClick={onOpenPresentation}
-          className="btn btn-secondary btn-sm"
-          style={{ border: '1px solid rgba(6, 182, 212, 0.4)', background: 'rgba(6, 182, 212, 0.1)' }}
-        >
-          <Presentation size={14} color="#06b6d4" />
-          <span>Pitch Deck</span>
-        </button>
-
         {/* Backend health status badge */}
         <div style={{
           display: 'flex',
