@@ -135,6 +135,7 @@ export const App: React.FC = () => {
             analysisData={analysisData}
             settings={settings}
             onUpdateTasks={handleUpdateTasks}
+            onNavigateToReview={() => setActiveTab('approval')}
           />
         )}
 
