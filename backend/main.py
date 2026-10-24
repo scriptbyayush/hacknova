@@ -14,7 +14,10 @@ from models import (
 from ai_engine import process_meeting_transcript
 from conflict_detector import detect_conflicts
 from integrations import export_to_trello
+import asyncio
 import github_service
+import firestore_service
+from google_meet import router as google_meet_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("meetflow")
@@ -25,6 +28,8 @@ app = FastAPI(
     version="2.0.0"
 )
 
+
+app.include_router(google_meet_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -57,6 +62,11 @@ async def startup_event():
     for t in res.tasks:
         STORE["tasks"][t.id] = t
     logger.info(f"[STARTUP] Seeded {len(res.tasks)} tasks from benchmark transcript.")
+    # Persist benchmark to Cloud Firestore collections
+    asyncio.create_task(firestore_service.save_meeting(res))
+    for t in res.tasks:
+        asyncio.create_task(firestore_service.save_task(t, res.meeting_id))
+    asyncio.create_task(firestore_service.log_audit_event("startup_seeded", meeting_id=res.meeting_id, details={"tasks_count": len(res.tasks)}))
 
 
 @app.get("/")
@@ -87,6 +97,11 @@ async def analyze_transcript(req: MeetingAnalysisRequest):
     STORE["current_meeting_id"] = result.meeting_id
     for t in result.tasks:
         STORE["tasks"][t.id] = t
+    # Store meeting and tasks in Firestore collections
+    asyncio.create_task(firestore_service.save_meeting(result))
+    for t in result.tasks:
+        asyncio.create_task(firestore_service.save_task(t, result.meeting_id))
+    asyncio.create_task(firestore_service.log_audit_event("transcript_analyzed", meeting_id=result.meeting_id, details={"title": result.title, "tasks_count": len(result.tasks)}))
     return result
 
 
@@ -136,6 +151,14 @@ def handle_task_action(task_id: str, payload: TaskApprovalRequest):
                 setattr(task, k, v)
 
     detect_conflicts(list(STORE["tasks"].values()))
+    # Sync task update & audit log to Firestore
+    asyncio.create_task(firestore_service.update_task_fields(task_id, {
+        "approval_status": task.approval_status.value,
+        "status": task.status.value,
+        "classification": task.classification.value,
+        "deadline": task.deadline
+    }))
+    asyncio.create_task(firestore_service.log_audit_event(f"task_{action}", task_id=task_id, task_title=task.title))
     return task
 
 
@@ -225,7 +248,7 @@ async def publish_to_github(req: GitHubPublishRequest):
         )
         results.append(result)
 
-        # Log to publication audit log
+        # Log to publication audit log & Cloud Firestore
         STORE["publication_log"].append({
             "timestamp": datetime.utcnow().isoformat(),
             "task_id": task.id,
@@ -235,6 +258,21 @@ async def publish_to_github(req: GitHubPublishRequest):
             "issue_number": result.get("issue_number"),
             "issue_url": result.get("external_url"),
         })
+        if result.get("external_url"):
+            asyncio.create_task(firestore_service.update_task_fields(task.id, {
+                "github_issue_url": result.get("external_url")
+            }))
+        asyncio.create_task(firestore_service.log_audit_event(
+            action="github_issue_dispatched",
+            task_id=task.id,
+            task_title=task.title,
+            details={
+                "repo": f"{req.owner}/{req.repo}",
+                "issue_number": result.get("issue_number"),
+                "issue_url": result.get("external_url"),
+                "status": result.get("status")
+            }
+        ))
 
     success_count = sum(1 for r in results if r.get("status") == "success")
     dup_count = sum(1 for r in results if r.get("status") == "already_published")
@@ -288,6 +326,12 @@ async def export_tasks(req: ExportRequest):
 
 
 # ─── Dashboard Stats ──────────────────────────────────────────────────────────
+
+
+@app.get("/api/firestore/status")
+async def get_firestore_status():
+    """Retrieve live document counts from Cloud Firestore collections."""
+    return await firestore_service.get_collections_summary()
 
 @app.get("/api/stats")
 def get_dashboard_stats():

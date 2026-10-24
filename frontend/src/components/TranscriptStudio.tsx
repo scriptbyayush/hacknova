@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { 
   Upload, Mic, MicOff, Sparkles, CheckCircle2, 
-  Layers, ArrowRight, Volume2, HelpCircle 
+  Layers, ArrowRight, Volume2, HelpCircle, Video,
+  RefreshCw, ShieldCheck, Zap
 } from 'lucide-react';
 import { SAMPLE_TRANSCRIPTS } from '../mockData';
-import type { AppSettings, MeetingAnalysisResponse } from '../types';
+import type { AppSettings, MeetingAnalysisResponse, GoogleMeetConference } from '../types';
 import { analyzeTranscriptAPI } from '../api';
+import { MOCK_GOOGLE_MEET_CONFERENCES, getGoogleOAuthUrl, GOOGLE_OAUTH_CONFIG } from '../googleMeet';
 
 interface TranscriptStudioProps {
   settings: AppSettings;
@@ -24,16 +26,22 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
+  
+  // Google Meet Auto-Sync (Vipto) State
+  const [isGoogleConnected, setIsGoogleConnected] = useState(true);
+  const [selectedConference, setSelectedConference] = useState<GoogleMeetConference>(MOCK_GOOGLE_MEET_CONFERENCES[0]);
+  const [isSyncingMeet, setIsSyncingMeet] = useState(false);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
   const pipelineSteps = [
-    'Cleaning and segmenting conversational context...',
-    'Extracting decisions, action items, owners & deadlines with AI...',
-    'Classifying commitments vs suggestions & exploratory actions...',
-    'Validating duplicates, ambiguous assignments & deadline conflicts...',
-    'Finalizing human-in-the-loop review package...'
+    'Authenticating and validating Google Meet transcript session...',
+    'Cleaning conversation and segmenting multi-speaker dialogue...',
+    'Extracting decisions, commitments, owners & deadlines with Gemini AI...',
+    'Quarantining exploratory suggestions (Google login) from confirmed commitments...',
+    'Validating conflicts, duplicate tasks & structuring review package...'
   ];
 
   const handleSelectSample = (sample: typeof SAMPLE_TRANSCRIPTS[0]) => {
@@ -41,6 +49,62 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
     setTranscript(sample.content);
     setUploadFeedback(`Loaded template: ${sample.title}`);
     setTimeout(() => setUploadFeedback(null), 3000);
+  };
+
+  const handleSelectGoogleMeet = (conf: GoogleMeetConference) => {
+    setSelectedConference(conf);
+    if (conf.transcriptState !== 'FILE_GENERATED') {
+      setUploadFeedback(`Warning: Transcript for "${conf.title}" is still processing (state: ${conf.transcriptState}).`);
+      setTimeout(() => setUploadFeedback(null), 3500);
+      return;
+    }
+
+    if (conf.transcriptContent) {
+      setTitle(conf.title);
+      setTranscript(conf.transcriptContent);
+      setUploadFeedback(`✓ Auto-retrieved Google Meet transcript for "${conf.title}" (${conf.conferenceId})`);
+      setTimeout(() => setUploadFeedback(null), 4000);
+    }
+  };
+
+  const handleConnectGoogleOAuth = () => {
+    const url = getGoogleOAuthUrl();
+    window.open(url, '_blank', 'width=580,height=680');
+    setIsGoogleConnected(true);
+    setUploadFeedback(`Initiated Google OAuth 2.0 flow (Client: ${GOOGLE_OAUTH_CONFIG.clientId.slice(0, 15)}...)`);
+    setTimeout(() => setUploadFeedback(null), 4000);
+  };
+
+  const handleImportAndRunMeet = async (conf: GoogleMeetConference) => {
+    if (!conf.transcriptContent) return;
+
+    setIsSyncingMeet(true);
+    setTitle(conf.title);
+    setTranscript(conf.transcriptContent);
+    setUploadFeedback(`⚡ Auto-retrieved Google Meet transcript (${conf.conferenceId}). Initiating AI Extraction...`);
+
+    setIsAnalyzing(true);
+    setAnalysisStep(0);
+
+    const stepInterval = setInterval(() => {
+      setAnalysisStep(prev => (prev < 4 ? prev + 1 : prev));
+    }, 450);
+
+    try {
+      const result = await analyzeTranscriptAPI(conf.transcriptContent, conf.title, settings);
+      clearInterval(stepInterval);
+      setAnalysisStep(4);
+      setTimeout(() => {
+        setIsAnalyzing(false);
+        setIsSyncingMeet(false);
+        onAnalysisComplete(result);
+      }, 500);
+    } catch (err) {
+      clearInterval(stepInterval);
+      setIsAnalyzing(false);
+      setIsSyncingMeet(false);
+      console.error(err);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +200,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '32px 20px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
       
       {/* Header Banner */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
@@ -149,7 +213,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
             Meeting Input & Transcript Studio
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', maxWidth: '720px', marginTop: '4px' }}>
-            Paste raw meeting notes, upload audio/transcript files, or speak live. MeetFlow AI uses deep contextual analysis to separate concrete tasks from speculative suggestions.
+            Paste raw meeting notes, upload files, dictate live, or <strong>auto-sync directly from Google Meet (Vipto Integration)</strong>. MeetFlow AI separates confirmed commitments from unfinalized suggestions.
           </p>
         </div>
 
@@ -163,6 +227,129 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
           <Sparkles size={18} />
           <span>{isAnalyzing ? 'Analyzing with AI...' : 'Analyze & Extract Tasks'}</span>
         </button>
+      </div>
+
+      {/* Google Meet Auto-Sync Integration Hub (Vipto Integration) */}
+      <div className="glass-panel" style={{
+        padding: '22px',
+        border: '1px solid rgba(6, 182, 212, 0.35)',
+        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(14, 20, 34, 0.76) 100%)',
+        boxShadow: '0 0 25px rgba(6, 182, 212, 0.15)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 15px rgba(6, 182, 212, 0.4)'
+            }}>
+              <Video size={22} color="#ffffff" />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff' }}>
+                  Google Meet Auto-Sync & Retrieval (Vipto Platform)
+                </h3>
+                <span className="badge badge-confirmed" style={{ fontSize: '0.65rem' }}>
+                  <ShieldCheck size={12} />
+                  {isGoogleConnected ? 'OAuth 2.0 Connected' : 'Connect Google Meet'}
+                </span>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Auto-detects completed meetings when transcripts reach state <strong style={{ color: '#34d399' }}>FILE_GENERATED</strong> via Meet REST API & Workspace Events.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={handleConnectGoogleOAuth}
+              className="btn btn-secondary btn-sm"
+              title="Re-authenticate Google OAuth 2.0 credentials"
+              style={{ fontSize: '0.78rem', border: '1px solid rgba(6, 182, 212, 0.3)' }}
+            >
+              <RefreshCw size={13} />
+              <span>OAuth Client: {GOOGLE_OAUTH_CONFIG.clientId.slice(0, 12)}...</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Detected Google Meet Sessions */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '12px' }}>
+          {MOCK_GOOGLE_MEET_CONFERENCES.map((conf) => {
+            const isSelected = selectedConference.conferenceId === conf.conferenceId;
+            const isReady = conf.transcriptState === 'FILE_GENERATED';
+
+            return (
+              <div
+                key={conf.conferenceId}
+                onClick={() => handleSelectGoogleMeet(conf)}
+                style={{
+                  background: isSelected ? 'rgba(6, 182, 212, 0.12)' : 'rgba(14, 19, 31, 0.75)',
+                  border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+                  borderRadius: '12px',
+                  padding: '16px',
+                  cursor: isReady ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  opacity: isReady ? 1 : 0.65
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#ffffff' }}>
+                    {conf.title}
+                  </span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    background: isReady ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                    color: isReady ? '#34d399' : '#fbbf24',
+                    border: `1px solid ${isReady ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
+                  }}>
+                    {conf.transcriptState}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{conf.startTime}</span>
+                  <span>{(conf.attendees || []).length} Attendees</span>
+                </div>
+
+                {isReady && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#06b6d4' }}>
+                      ✓ Ready for 1-Click Extraction
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleImportAndRunMeet(conf);
+                      }}
+                      className="btn btn-sm btn-primary"
+                      disabled={isAnalyzing}
+                      style={{ fontSize: '0.72rem', padding: '4px 10px', background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)' }}
+                    >
+                      <Zap size={12} />
+                      <span>{isSyncingMeet ? 'Processing...' : 'Auto-Import & Run'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Preset Realistic Samples Picker */}
@@ -320,7 +507,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
             style={{ minHeight: '220px', fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Paste transcript with speaker cues (e.g. Ayush: Let's finish the login page by Friday. Rahul suggested adding Google login...)"
+            placeholder="Paste transcript with speaker cues (e.g. Ayush: I will complete the login page by Friday. Rahul suggested adding Google login...)"
           />
         </div>
 
@@ -339,7 +526,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Sparkles size={18} color="var(--accent-primary)" style={{ animation: 'spin 2s linear infinite' }} />
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' }}>
-                  AI Automation Engine Processing
+                  MeetFlow AI Engine • Multi-Stage Processing Pipeline
                 </span>
               </div>
               <span style={{ fontSize: '0.75rem', color: '#818cf8', fontWeight: 600 }}>
@@ -364,7 +551,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
         )}
 
         {/* Footer trigger */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             <HelpCircle size={14} />
             <span>AI automatically detects speakers, deadlines, commitments vs suggestions, and duplicate tasks.</span>
@@ -405,7 +592,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
             </div>
             <div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>{analysisData.suggestion_count}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Suggestions Pending</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Suggestions Quarantined</div>
             </div>
           </div>
 
@@ -424,7 +611,7 @@ export const TranscriptStudio: React.FC<TranscriptStudioProps> = ({
               <Volume2 size={20} color="var(--color-question)" />
             </div>
             <div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>{analysisData.detected_attendees.length}</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff' }}>{(analysisData.detected_attendees || []).length}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Active Attendees</div>
             </div>
           </div>

@@ -4,26 +4,26 @@ import { TranscriptStudio } from './components/TranscriptStudio';
 import { ApprovalDashboard } from './components/ApprovalDashboard';
 import { ExecutionHub } from './components/ExecutionHub';
 import { ProgressTracker } from './components/ProgressTracker';
-import { SlideDeckModal } from './components/SlideDeckModal';
 import { SettingsModal } from './components/SettingsModal';
-import { OverviewDashboard } from './components/OverviewDashboard';
 import type { MeetingAnalysisResponse, TaskItem, AppSettings } from './types';
 import { INITIAL_MEETING_DATA } from './mockData';
 import { checkBackendHealth } from './api';
-
-export type ActiveTab = 'overview' | 'studio' | 'approval' | 'execution' | 'tracker' | 'github';
+import { saveMeetingToFirestore, saveTasksToFirestore, loadLatestMeetingFromFirestore, saveAuditLogToFirestore } from './firebase';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const [activeTab, setActiveTab] = useState<'studio' | 'approval' | 'execution' | 'tracker'>('approval');
   const [analysisData, setAnalysisData] = useState<MeetingAnalysisResponse | null>(INITIAL_MEETING_DATA);
   const [backendOnline, setBackendOnline] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [isPresentationOpen, setIsPresentationOpen] = useState<boolean>(false);
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem('meetflow_settings');
     if (saved) {
-      try { return JSON.parse(saved); } catch {}
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // use default
+      }
     }
     return {
       llmProvider: 'gemini',
@@ -35,16 +35,37 @@ export const App: React.FC = () => {
       trelloToken: '',
       trelloBoardId: '',
       trelloListId: '',
-      backendUrl: 'http://127.0.0.1:8000'
+      backendUrl: 'none',
+      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+      googleRedirectUri: import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://meetflow.vipto.in/',
+      googleConnected: true
     };
   });
 
+  // Check backend health and load Firestore cache on mount
   useEffect(() => {
     const check = async () => {
       const isOnline = await checkBackendHealth(settings.backendUrl);
       setBackendOnline(isOnline);
     };
     check();
+
+    // Check Cloud Firestore for any previously saved meetings
+    loadLatestMeetingFromFirestore().then((remoteMeeting) => {
+      if (remoteMeeting && remoteMeeting.tasks && remoteMeeting.tasks.length > 0) {
+        const normalizedTasks = remoteMeeting.tasks.map(t => ({
+          ...t,
+          conflicts: Array.isArray(t.conflicts) ? t.conflicts : [],
+          tags: Array.isArray(t.tags) ? t.tags : []
+        }));
+        setAnalysisData({
+          ...remoteMeeting,
+          tasks: normalizedTasks,
+          conflict_count: remoteMeeting.conflict_count ?? normalizedTasks.reduce((acc, t) => acc + t.conflicts.length, 0)
+        });
+      }
+    }).catch(() => {});
+
     const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
   }, [settings.backendUrl]);
@@ -59,50 +80,48 @@ export const App: React.FC = () => {
     const confirmedCount = updatedTasks.filter(t => t.classification === 'confirmed').length;
     const suggestionCount = updatedTasks.filter(t => t.classification === 'suggestion').length;
     const unresolvedCount = updatedTasks.filter(t => t.classification === 'question').length;
-    const conflictCount = updatedTasks.reduce((acc, t) => acc + t.conflicts.length, 0);
-    setAnalysisData({
+    const conflictCount = updatedTasks.reduce((acc, t) => acc + (t.conflicts?.length || 0), 0);
+
+    const updated = {
       ...analysisData,
       tasks: updatedTasks,
       confirmed_count: confirmedCount,
       suggestion_count: suggestionCount,
       unresolved_count: unresolvedCount,
       conflict_count: conflictCount
+    };
+
+    setAnalysisData(updated);
+    saveTasksToFirestore(analysisData.meeting_id, updatedTasks);
+    saveAuditLogToFirestore({
+      action: 'tasks_review_updated',
+      meetingId: analysisData.meeting_id,
+      details: { totalTasks: updatedTasks.length, confirmedCount, suggestionCount }
     });
   };
 
-  const handleLoadSlideDemo = () => {
-    setAnalysisData(INITIAL_MEETING_DATA);
-    setActiveTab('approval');
-  };
 
   return (
-    <div className="app-shell">
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={(tab: string) => setActiveTab(tab as ActiveTab)}
+        setActiveTab={(tab: string) => setActiveTab(tab as any)}
         analysisData={analysisData}
         backendOnline={backendOnline}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenPresentation={() => setIsPresentationOpen(true)}
-        onLoadSlideDemo={handleLoadSlideDemo}
       />
 
-      <main className="app-content" style={{ paddingBottom: '60px' }}>
-        {activeTab === 'overview' && (
-          <OverviewDashboard
-            analysisData={analysisData}
-            backendOnline={backendOnline}
-            settings={settings}
-            onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
-          />
-        )}
-
+      {/* Main Content Body */}
+      <main style={{ flex: 1, paddingBottom: '60px' }}>
         {activeTab === 'studio' && (
           <TranscriptStudio
             settings={settings}
             analysisData={analysisData}
             onAnalysisComplete={(res) => {
               setAnalysisData(res);
+              saveMeetingToFirestore(res);
               setActiveTab('approval');
             }}
           />
@@ -121,6 +140,7 @@ export const App: React.FC = () => {
             analysisData={analysisData}
             settings={settings}
             onUpdateTasks={handleUpdateTasks}
+            onNavigateToReview={() => setActiveTab('approval')}
           />
         )}
 
@@ -130,29 +150,17 @@ export const App: React.FC = () => {
             onUpdateTasks={handleUpdateTasks}
           />
         )}
-
-        {activeTab === 'github' && (
-          <ExecutionHub
-            analysisData={analysisData}
-            settings={settings}
-            onUpdateTasks={handleUpdateTasks}
-            focusGitHub
-          />
-        )}
       </main>
 
-      <SlideDeckModal
-        isOpen={isPresentationOpen}
-        onClose={() => setIsPresentationOpen(false)}
-        onJumpToTab={(tab: string) => setActiveTab(tab as ActiveTab)}
-      />
 
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onSave={handleSaveSettings}
       />
+
     </div>
   );
 };

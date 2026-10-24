@@ -86,16 +86,16 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   };
 
   // Build workload from local data if no backend
-  const workload = Object.keys(stats.workload_by_member).length > 0
-    ? stats.workload_by_member
+  const workload = Object.keys(stats.workload_by_member || {}).length > 0
+    ? (stats.workload_by_member || {})
     : tasks.reduce((acc: Record<string, number>, t) => {
         const name = t.assignee || 'Unassigned';
         acc[name] = (acc[name] || 0) + 1;
         return acc;
       }, {});
 
-  const statusDist = Object.keys(stats.status_distribution).length > 0
-    ? stats.status_distribution
+  const statusDist = Object.keys(stats.status_distribution || {}).length > 0
+    ? (stats.status_distribution || {})
     : tasks.reduce((acc: Record<string, number>, t) => {
         acc[t.status] = (acc[t.status] || 0) + 1;
         return acc;
@@ -312,7 +312,8 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {Object.entries(statusDist).map(([status, count]) => {
+              {Object.entries(statusDist).map(([status, countVal]) => {
+                const count = Number(countVal);
                 const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                 const color = STATUS_COLORS[status] || 'var(--text-3)';
                 return (
@@ -349,10 +350,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {Object.entries(workload)
-                .sort(([, a], [, b]) => b - a)
+                .sort(([, a], [, b]) => Number(b) - Number(a))
                 .slice(0, 6)
-                .map(([name, count], i) => {
-                  const maxCount = Math.max(...Object.values(workload));
+                .map(([name, countVal], i) => {
+                  const count = Number(countVal);
+                  const maxCount = Math.max(...Object.values(workload).map(v => Number(v)), 1);
                   const pct = Math.round((count / maxCount) * 100);
                   const colors = ['var(--indigo-light)', 'var(--cyan)', 'var(--green-2)', 'var(--amber-2)', 'var(--violet)', 'var(--red-2)'];
                   const color = colors[i % colors.length];
